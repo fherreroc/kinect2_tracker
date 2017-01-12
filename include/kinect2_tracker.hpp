@@ -215,22 +215,22 @@ public:
   }
 
   //Publish the calibration tf_frame as the cross product of the shoulder vectors
- -// This function publishes the calibration_space opposite the shoulders of the user
- -  void publishCalibrationOriginTF(nite::SkeletonJoint skelTorso, nite::SkeletonJoint skelRshoulder, nite::SkeletonJoint skelLshoulder, int uid) 
- -  {
- -    if (skelTorso.getPositionConfidence() > 0.0)
- -    {
- -      tf::Transform calibrationOriginTransform;
- -      tf::Transform torsoTransform;
- -
- -            tf::Vector3 torsoVec3 = tf::Vector3(skelTorso.getPosition().x / 1000.0, skelTorso.getPosition().y / 1000.0, skelTorso.getPosition().z / 1000.0);
- -            torsoTransform.setOrigin(torsoVec3);
- -            torsoTransform.setRotation(tf::Quaternion(0,0,0,1));
- -
- -            tf::Vector3 RshoulderVec3 = tf::Vector3(skelRshoulder.getPosition().x / 1000.0, skelRshoulder.getPosition().y / 1000.0, skelRshoulder.getPosition().z / 1000.0);                 //create a vector for the right shoulder
- -            RshoulderVec3 = (RshoulderVec3 - torsoVec3); //vector is the difference of the two
- -
- -            tf::Vector3 LshoulderVec3 = tf::Vector3(skelLshoulder.getPosition().x / 1000.0, skelLshoulder.getPosition().y / 1000.0, skelLshoulder.getPosition().z / 1000.0);                 //create a vector for the left shoulder
+  // This function publishes the calibration_space opposite the shoulders of the user
+   void publishCalibrationOriginTF(nite::SkeletonJoint skelTorso, nite::SkeletonJoint skelRshoulder, nite::SkeletonJoint skelLshoulder, int uid) 
+   {
+     if (skelTorso.getPositionConfidence() > 0.0)
+     {
+       tf::Transform calibrationOriginTransform;
+       tf::Transform torsoTransform;
+ 
+             tf::Vector3 torsoVec3 = tf::Vector3(skelTorso.getPosition().x / 1000.0, skelTorso.getPosition().y / 1000.0, skelTorso.getPosition().z / 1000.0);
+             torsoTransform.setOrigin(torsoVec3);
+             torsoTransform.setRotation(tf::Quaternion(0,0,0,1));
+ 
+             tf::Vector3 RshoulderVec3 = tf::Vector3(skelRshoulder.getPosition().x / 1000.0, skelRshoulder.getPosition().y / 1000.0, skelRshoulder.getPosition().z / 1000.0);                 //create a vector for the right shoulder
+             RshoulderVec3 = (RshoulderVec3 - torsoVec3); //vector is the difference of the two
+ 
+             tf::Vector3 LshoulderVec3 = tf::Vector3(skelLshoulder.getPosition().x / 1000.0, skelLshoulder.getPosition().y / 1000.0, skelLshoulder.getPosition().z / 1000.0);                 //create a vector for the left shoulder
             LshoulderVec3 = (LshoulderVec3 - torsoVec3);
             tf::Vector3 calibrationOriginVec3 = RshoulderVec3.cross(LshoulderVec3);
 
