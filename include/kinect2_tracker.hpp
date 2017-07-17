@@ -1,14 +1,14 @@
 /**
- * \ref kinect2_tracker.hpp
- *
- *  \date 20160322
- *  \author Stephen Reddish
- *  \version 1.0
- *  \bug
- *   It will be quicker to work out the vec3s before passing them to the transform publisher
- *   Solve bodgey if torso elses 
- *  \copyright GNU Public License.
- */
+* \ref kinect2_tracker.hpp
+*
+*  \date 20160322
+*  \author Stephen Reddish
+*  \version 1.0
+*  \bug
+*   It will be quicker to work out the vec3s before passing them to the transform publisher
+*   Solve bodgey if torso elses 
+*  \copyright GNU Public License.
+*/
 
 #ifndef KINECT2_TRACKER_HPP_
 #define KINECT2_TRACKER_HPP_
@@ -43,16 +43,16 @@
 typedef std::map<std::string, nite::SkeletonJoint> JointMap;
 
 /**
- * Class \ref kinect2_tracker. This class can track the skeleton of people and returns joints as a TF stream,
- */
+* Class \ref kinect2_tracker. This class can track the skeleton of people and returns joints as a TF stream,
+*/
 class kinect2_tracker
 {
 public:
   /**
-   * Constructor
-   */
-  kinect2_tracker() :
-      it_(nh_)
+  * Constructor
+  */
+  kinect2_tracker() //:
+    // it(nh_)
   {
 
     // Get some parameters from the server
@@ -63,6 +63,7 @@ public:
       ros::shutdown();
       return;
     }
+
     if (!pnh.getParam("relative_frame", relative_frame_))
     {
       ROS_FATAL("relative_frame not found on Param Server! Maybe you should add it to your launch file!");
@@ -85,7 +86,34 @@ public:
       ros::shutdown();
       return;
     }
-    ROS_INFO("Device opened");
+    else
+      ROS_INFO("Device opened");
+
+    if(this->depth_stream.create(this->devDevice_,openni::SENSOR_DEPTH)==openni::STATUS_OK)
+    {
+      //Set depth mode
+//      const openni::SensorInfo* sinfo = this->devDevice_.getSensorInfo(openni::SENSOR_DEPTH);
+//      const openni::Array< openni::VideoMode>& modesDepth = sinfo->getSupportedVideoModes();
+//      if(this->depth_stream.setVideoMode(modesDepth[0]) != openni::STATUS_OK)
+//        ROS_ERROR("Depth format not supported...");
+
+      if(this->depth_stream.start()!=openni::STATUS_OK)
+      {
+        ROS_FATAL("Impossible to start depth stream");
+        ros::shutdown();
+        return;
+      }
+      else
+      {
+        ROS_INFO("Depth stream initialize successfully");
+      }
+    }
+    else
+    {
+      ROS_FATAL("Impossible to create depth stream");
+      ros::shutdown();
+      return;
+    }
 
     // Initialize the tracker
     nite::NiTE::initialize();
@@ -102,32 +130,51 @@ public:
     // Initialize the users IDs publisher
     userPub_ = nh_.advertise<skeleton_tracker::user_IDs>("/people", 1);
 
+    this->image_out_publisher_ = nh_.advertise<sensor_msgs::Image>("image_out/image_raw", 1);
+
     rate_ = new ros::Rate(100);
 
   }
   /**
-   * Destructor
-   */
+  * Destructor
+  */
   ~kinect2_tracker()
   {
     nite::NiTE::shutdown();
   }
 
   /**
-   * Spinner!!!
-   */
+  * Spinner!!!
+  */
   void spinner()
   {
     // Broadcast the joint frames (if they exist)
     this->getSkeleton();
+
+
+    //Depth
+    this->depth_stream.readFrame(&this->depth_frame);
+    //ROS_INFO("Depth stream resolution %dx%d, data size: %d", this->depth_frame.getHeight(), this->depth_frame.getWidth(),this->depth_frame.getDataSize());
+    //std::cout << "height: " << this->depth_frame.getHeight() << " width: " << this->depth_frame.getWidth() << std::endl;
+    //std::cout << "data size: " << this->depth_frame.getDataSize() << std::endl;
+    this->image_out_Image_msg_.header.stamp=ros::Time::now();
+    this->image_out_Image_msg_.height=this->depth_frame.getHeight();
+    this->image_out_Image_msg_.width=this->depth_frame.getWidth();
+    this->image_out_Image_msg_.encoding="mono16";
+    this->image_out_Image_msg_.step=this->depth_frame.getWidth()*2;
+    this->image_out_Image_msg_.data.resize(this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+    memcpy(this->image_out_Image_msg_.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+    this->image_out_publisher_.publish(this->image_out_Image_msg_);
+
+
     rate_->sleep();
   }
 
   /**
-   * Update the Users State
-   * @param user: the user
-   * @param ts: timestamp
-   */
+  * Update the Users State
+  * @param user: the user
+  * @param ts: timestamp
+  */
   void updateUserState(const nite::UserData& user, unsigned long long ts)
   {
     if (user.isNew())
@@ -166,106 +213,71 @@ public:
   }
 
   /**
-   * Publish the joints over the TF stream
-   * @param j_name: joint name
-   * @param j: the joint
-   * @param r: relative joint (joint j connects to)
-   * @param uid: user's ID
-   */
-  void publishJointTF(std::string j_name, nite::SkeletonJoint j, std::string r_name, nite::SkeletonJoint r, int uid) 
+  * Publish the joints over the TF stream
+  * @param actual_joint_name: joint name
+  * @param actual_joint: the current joint
+  * @param parent_joint_name: parent joint name connected to actual_joint
+  * @param parent_joint: the parent joint
+  * @param uid: user's ID
+  */
+  void publishJointTF(std::string         actual_joint_name, 
+                      nite::SkeletonJoint actual_joint, 
+                      std::string         parent_joint_name, 
+                      nite::SkeletonJoint parent_joint, 
+                      int                 uid) 
   {
-    if (j.getPositionConfidence() > 0.0)
+    if (actual_joint.getPositionConfidence() > 0.0)
     {
-      tf::Vector3 currentVec3 = tf::Vector3(j.getPosition().x / 1000.0, j.getPosition().y / 1000.0, j.getPosition().z / 1000.0);
+      tf::Vector3 actualPos = tf::Vector3(actual_joint.getPosition().x / 1000.0, actual_joint.getPosition().y / 1000.0, actual_joint.getPosition().z / 1000.0);
+      tf::Vector3 parentPos = tf::Vector3(parent_joint.getPosition().x / 1000.0, parent_joint.getPosition().y / 1000.0, parent_joint.getPosition().z / 1000.0);
+      
+      tf::Quaternion actualRot;
+      if(actual_joint.getOrientationConfidence() > 0.0)
+        actualRot = tf::Quaternion(actual_joint.getOrientation().x, actual_joint.getOrientation().y, actual_joint.getOrientation().z, actual_joint.getOrientation().w);
+      else
+        actualRot = tf::Quaternion(0,0,0,1);
+      
+      tf::Quaternion parentRot;
+      if(parent_joint.getOrientationConfidence() > 0.0)
+        parentRot = tf::Quaternion(parent_joint.getOrientation().x, parent_joint.getOrientation().y, parent_joint.getOrientation().z, parent_joint.getOrientation().w);
+      else
+        parentRot = tf::Quaternion(0,0,0,1);
+
       tf::Transform transform;
-        if (j_name != "torso")
-        {
-            tf::Vector3 rVec3 = tf::Vector3(r.getPosition().x / 1000.0, r.getPosition().y / 1000.0, r.getPosition().z / 1000.0);
-            transform.setOrigin(currentVec3 - rVec3);
-            transform.setRotation(tf::Quaternion(0,0,0,1));
-        }
-        else
-        {
-            transform.setOrigin(currentVec3);
-            transform.setRotation(tf::Quaternion(0,0,0,1));
-        }
-      
-        std::stringstream j_frame_id_stream; //stringstream of frame id values
-        std::string j_frame_id; // string of the stringstream
-        j_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << j_name;
-        j_frame_id = j_frame_id_stream.str();
+      if(actual_joint_name!="torso")
+      {
+        transform.setOrigin(actualPos);
+        transform.setRotation(actualRot);
+        tf::Transform transform_parent;
+        transform_parent.setOrigin(parentPos);
+        transform_parent.setRotation(parentRot);
+        transform = transform_parent.inverse()*transform;
+      }
+      else
+      {
+        transform.setOrigin(actualPos);
+        transform.setRotation(actualRot);
+      }
 
-        std::stringstream r_frame_id_stream; //stringstream of frame id values
-        std::string r_frame_id; // string of the stringstream
-        r_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << r_name;
-        r_frame_id = r_frame_id_stream.str();
-        
-        if (j_name == "torso")
-        {
-	        
-            tfBroadcast_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), relative_frame_, j_frame_id));
-        }
-        else
-        {
-            
-            tfBroadcast_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), r_frame_id, j_frame_id));
-        }
-    }
-    return;
-  }
+      std::stringstream actual_frame_id_stream;
+      actual_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << actual_joint_name;
+      std::string actual_frame_id = actual_frame_id_stream.str();
 
-  //Publish the calibration tf_frame as the cross product of the shoulder vectors
-  // This function publishes the calibration_space opposite the shoulders of the user
-   void publishCalibrationOriginTF(nite::SkeletonJoint skelTorso, nite::SkeletonJoint skelRshoulder, nite::SkeletonJoint skelLshoulder, int uid) 
-   {
-     if (skelTorso.getPositionConfidence() > 0.0)
-     {
-       tf::Transform calibrationOriginTransform;
-       tf::Transform torsoTransform;
- 
-             tf::Vector3 torsoVec3 = tf::Vector3(skelTorso.getPosition().x / 1000.0, skelTorso.getPosition().y / 1000.0, skelTorso.getPosition().z / 1000.0);
-             torsoTransform.setOrigin(torsoVec3);
-             torsoTransform.setRotation(tf::Quaternion(0,0,0,1));
- 
-             tf::Vector3 RshoulderVec3 = tf::Vector3(skelRshoulder.getPosition().x / 1000.0, skelRshoulder.getPosition().y / 1000.0, skelRshoulder.getPosition().z / 1000.0);                 //create a vector for the right shoulder
-             RshoulderVec3 = (RshoulderVec3 - torsoVec3); //vector is the difference of the two
- 
-             tf::Vector3 LshoulderVec3 = tf::Vector3(skelLshoulder.getPosition().x / 1000.0, skelLshoulder.getPosition().y / 1000.0, skelLshoulder.getPosition().z / 1000.0);                 //create a vector for the left shoulder
-            LshoulderVec3 = (LshoulderVec3 - torsoVec3);
-            tf::Vector3 calibrationOriginVec3 = RshoulderVec3.cross(LshoulderVec3);
+      std::stringstream parent_frame_id_stream;
+      parent_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << parent_joint_name;
+      std::string parent_frame_id = parent_frame_id_stream.str();
 
-		//give the calibration origin some length
-//	   calibrationOriginVec3 = calibrationOriginVec3 * 20;
-           calibrationOriginTransform.setOrigin(calibrationOriginVec3);// set the x,y,z coordinates of the calibration transform frame
+      if(actual_joint_name!="torso")
+        tfBroadcast_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), parent_frame_id, actual_frame_id));
+      else
+        tfBroadcast_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), parent_joint_name, actual_frame_id));
 
-              Eigen::Vector3d eigencalibrationOriginVec3;
-              tf::vectorTFToEigen(calibrationOriginVec3, eigencalibrationOriginVec3); //conversion of tf:Vec3 to eigen
-              Eigen::Vector3d eigenTorsoVec3;
-              tf::vectorTFToEigen(torsoVec3, eigenTorsoVec3);               //conversion of torse tf:vec3 to eigen
-              Eigen::Quaterniond eigen_calibrationOrigenQuaternion;
-              eigen_calibrationOrigenQuaternion.setFromTwoVectors(eigencalibrationOriginVec3, eigenTorsoVec3);
-              tf::Quaternion tf_calibrationOriginQuaternion;
-              tf::quaternionEigenToTF(eigen_calibrationOrigenQuaternion, tf_calibrationOriginQuaternion);
-
-            calibrationOriginTransform.setRotation(tf_calibrationOriginQuaternion);		
-      
-        std::stringstream calibration_frame_id_stream; //stringstream of frame id values
-        std::string calibration_frame_id; // string of the stringstream
-        calibration_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/calibrationOrigin";
-        calibration_frame_id = calibration_frame_id_stream.str();
-
-	std::stringstream r_frame_id_stream; //stringstream of frame id values
-        std::string r_frame_id; // string of the stringstream
-        r_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/torso";
-        r_frame_id = r_frame_id_stream.str();
-            
-        tfBroadcast_.sendTransform(tf::StampedTransform(calibrationOriginTransform, ros::Time::now(), r_frame_id, calibration_frame_id));
     }
     return;
   }
 
   /**
-   * Get the skeleton's joints and the users IDs and make them all relative to the Torso joint
+  * Get the skeleton's joints and the users IDs and make them all relative to the Torso joint
   */
   void getSkeleton()
   {
@@ -293,40 +305,40 @@ public:
       {
         JointMap named_joints;
 
-        named_joints["torso"] = (user.getSkeleton().getJoint(nite::JOINT_TORSO));// this value is Joint_name, position & orientation & confidence, userid
-        named_joints["left_hip"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HIP));
-        named_joints["right_hip"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HIP));
-        named_joints["left_knee"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_KNEE));
-        named_joints["right_knee"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_KNEE));
-        named_joints["left_foot"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_FOOT));
-        named_joints["right_foot"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_FOOT));
-        named_joints["neck"] = (user.getSkeleton().getJoint(nite::JOINT_NECK));  
-        named_joints["head"] = (user.getSkeleton().getJoint(nite::JOINT_HEAD));
-        named_joints["left_shoulder"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_SHOULDER));
+        named_joints["torso"]          = (user.getSkeleton().getJoint(nite::JOINT_TORSO));
+        named_joints["left_hip"]       = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HIP));
+        named_joints["right_hip"]      = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HIP));
+        named_joints["left_knee"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_KNEE));
+        named_joints["right_knee"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_KNEE));
+        named_joints["left_foot"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_FOOT));
+        named_joints["right_foot"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_FOOT));
+        named_joints["neck"]           = (user.getSkeleton().getJoint(nite::JOINT_NECK));  
+        named_joints["head"]           = (user.getSkeleton().getJoint(nite::JOINT_HEAD));
+        named_joints["left_shoulder"]  = (user.getSkeleton().getJoint(nite::JOINT_LEFT_SHOULDER));
         named_joints["right_shoulder"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_SHOULDER));
-        named_joints["left_elbow"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_ELBOW));
-        named_joints["right_elbow"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_ELBOW));
-        named_joints["left_hand"] = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HAND));
-        named_joints["right_hand"] = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HAND));
-//Publish the joint (name, niteConstruct, ConnectedJoint name, niteConstruct, User
-        publishJointTF("torso", named_joints["torso"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("left_hip", named_joints["left_hip"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("right_hip", named_joints["right_hip"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("left_knee", named_joints["left_knee"], "left_hip", named_joints["left_hip"], user.getId());
-        publishJointTF("right_knee", named_joints["right_knee"], "right_hip", named_joints["right_hip"], user.getId());
-        publishJointTF("left_foot", named_joints["left_foot"], "left_knee", named_joints["left_knee"], user.getId());
-        publishJointTF("right_foot", named_joints["right_foot"], "right_knee", named_joints["right_knee"], user.getId());
-        publishJointTF("neck", named_joints["neck"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("head", named_joints["head"], "neck", named_joints["neck"], user.getId());
-        publishJointTF("left_shoulder", named_joints["left_shoulder"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("right_shoulder", named_joints["right_shoulder"], "torso", named_joints["torso"], user.getId());
-        publishJointTF("left_elbow", named_joints["left_elbow"], "left_shoulder", named_joints["left_shoulder"], user.getId());
-        publishJointTF("right_elbow", named_joints["right_elbow"], "right_shoulder", named_joints["right_shoulder"], user.getId());
-        publishJointTF("left_hand", named_joints["left_hand"], "left_elbow", named_joints["left_elbow"], user.getId());
-        publishJointTF("right_hand", named_joints["right_hand"], "right_elbow", named_joints["right_elbow"], user.getId());
+        named_joints["left_elbow"]     = (user.getSkeleton().getJoint(nite::JOINT_LEFT_ELBOW));
+        named_joints["right_elbow"]    = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_ELBOW));
+        named_joints["left_hand"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HAND));
+        named_joints["right_hand"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HAND));
 
-//publishes the funny normal vector from the users chest
-        publishCalibrationOriginTF(named_joints["torso"], named_joints["left_shoulder"], named_joints["right_shoulder"], user.getId());
+        //Publish the joint (name, niteConstruct, ConnectedJoint name, niteConstruct, User)
+        publishJointTF("torso",          named_joints["torso"],          relative_frame_,  named_joints["torso"], user.getId());
+        publishJointTF("left_hip",       named_joints["left_hip"],       "torso",          named_joints["torso"], user.getId());
+        publishJointTF("right_hip",      named_joints["right_hip"],      "torso",          named_joints["torso"], user.getId());
+        publishJointTF("neck",           named_joints["neck"],           "torso",          named_joints["torso"], user.getId());
+        publishJointTF("head",           named_joints["head"],           "neck",           named_joints["neck"], user.getId());
+        publishJointTF("left_shoulder",  named_joints["left_shoulder"],  "neck",           named_joints["neck"], user.getId());
+        publishJointTF("right_shoulder", named_joints["right_shoulder"], "neck",           named_joints["neck"], user.getId());
+        publishJointTF("left_elbow",     named_joints["left_elbow"],     "left_shoulder",  named_joints["left_shoulder"], user.getId());
+        publishJointTF("right_elbow",    named_joints["right_elbow"],    "right_shoulder", named_joints["right_shoulder"], user.getId());
+        publishJointTF("left_hand",      named_joints["left_hand"],      "left_elbow",     named_joints["left_elbow"], user.getId());
+        publishJointTF("right_hand",     named_joints["right_hand"],     "right_elbow",    named_joints["right_elbow"], user.getId());
+        /**/
+        publishJointTF("left_knee",      named_joints["left_knee"],      "left_hip",       named_joints["left_hip"], user.getId());
+        publishJointTF("right_knee",     named_joints["right_knee"],     "right_hip",      named_joints["right_hip"], user.getId());
+        publishJointTF("left_foot",      named_joints["left_foot"],      "left_knee",      named_joints["left_knee"], user.getId());
+        publishJointTF("right_foot",     named_joints["right_foot"],     "right_knee",     named_joints["right_knee"], user.getId());
+        /**/
 
         // Add the user's ID
         ids.users.push_back(int(user.getId()));
@@ -343,7 +355,11 @@ public:
   nite::SkeletonState g_skeletonStates_[MAX_USERS] = {nite::SKELETON_NONE};
 
   /// Image transport
-  image_transport::ImageTransport it_;
+  //image_transport::ImageTransport it;
+  //image_transport::CameraPublisher camera_publisher_;
+  ros::Publisher image_out_publisher_;
+  sensor_msgs::Image image_out_Image_msg_;
+
   std::string tf_prefix_, relative_frame_;
 
   /// Frame broadcaster
@@ -351,6 +367,11 @@ public:
 
   /// The openni device
   openni::Device devDevice_;
+  openni::VideoFrameRef depth_frame;
+  openni::VideoFrameRef color_frame;
+
+  openni::VideoStream depth_stream;
+  openni::VideoStream color_stream;
 
   /// Some NITE stuff
   nite::UserTracker userTracker_;
