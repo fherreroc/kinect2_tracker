@@ -51,8 +51,8 @@ public:
   /**
   * Constructor
   */
-  kinect2_tracker() //:
-    // it(nh_)
+  kinect2_tracker() :
+     it(nh_)
   {
 
     // Get some parameters from the server
@@ -131,6 +131,7 @@ public:
     userPub_ = nh_.advertise<skeleton_tracker::user_IDs>("/people", 1);
 
     this->image_out_publisher_ = nh_.advertise<sensor_msgs::Image>("image_out/image_raw", 1);
+    this->camera_publisher = this->it.advertiseCamera("depth/image_raw", 1);
 
     rate_ = new ros::Rate(100);
 
@@ -151,8 +152,10 @@ public:
     // Broadcast the joint frames (if they exist)
     this->getSkeleton();
 
-
     //Depth
+    bool mirror=true;
+    this->depth_stream.setMirroringEnabled(mirror);
+
     this->depth_stream.readFrame(&this->depth_frame);
     //ROS_INFO("Depth stream resolution %dx%d, data size: %d", this->depth_frame.getHeight(), this->depth_frame.getWidth(),this->depth_frame.getDataSize());
     //std::cout << "height: " << this->depth_frame.getHeight() << " width: " << this->depth_frame.getWidth() << std::endl;
@@ -166,6 +169,64 @@ public:
     memcpy(this->image_out_Image_msg_.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
     this->image_out_publisher_.publish(this->image_out_Image_msg_);
 
+    
+    this->depth_img.header.stamp=ros::Time::now();
+    this->depth_img.header.frame_id="kinect2_link";
+    this->depth_img.height=this->depth_frame.getHeight();
+    this->depth_img.width=this->depth_frame.getWidth();
+    this->depth_img.encoding="mono16";
+    this->depth_img.step=this->depth_frame.getWidth()*2;
+    this->depth_img.data.resize(this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+    memcpy(this->depth_img.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+    
+    this->depth_info.header.stamp    = this->depth_img.header.stamp;
+    this->depth_info.header.frame_id = this->depth_img.header.frame_id;
+    this->depth_info.height          = this->depth_img.height;
+    this->depth_info.width           = this->depth_img.width;
+    this->depth_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+
+    float cx = 254.878f;
+    float cy = 205.395f;
+    float fx = 365.456f;
+    float fy = 365.456f;
+    float k1 = 0.0905474;
+    float k2 = -0.26819;
+    float k3 = 0.0950862;
+    float p1 = 0.0;
+    float p2 = 0.0; 
+
+    //float fx = devDevice_.getDepthFocalLength (); // Horizontal focal length
+    //float fy = devDevice_.getDepthFocalLength (); // Vertical focal length
+    //float cx = ((float)this->depth_frame.getWidth() - 1.f) / 2.f;  // Center x
+    //float cy = ((float)this->depth_frame.getHeight()- 1.f) / 2.f; // Center y    
+    //double k1,k2,k3,p1,p2=0.0;
+
+    this->depth_info.D.resize(5);
+    this->depth_info.D[0] = k1;
+    this->depth_info.D[1] = k2;
+    this->depth_info.D[2] = k3;
+    this->depth_info.D[3] = p1;
+    this->depth_info.D[4] = p2;
+
+
+    
+    this->depth_info.K.fill(0.0);
+    this->depth_info.K[0] = fx;
+    this->depth_info.K[2] = cx;
+    this->depth_info.K[4] = fy;
+    this->depth_info.K[5] = cy;
+    this->depth_info.K[8] = 1.0;
+
+    this->depth_info.R.fill(0.0);
+
+    this->depth_info.P.fill(0.0);
+    this->depth_info.P[0] = fx;
+    this->depth_info.P[2] = cx;
+    this->depth_info.P[5] = fy;
+    this->depth_info.P[6] = cy;
+    this->depth_info.P[10] = 1.0;
+    
+    this->camera_publisher.publish(this->depth_img, this->depth_info);
 
     rate_->sleep();
   }
@@ -355,8 +416,11 @@ public:
   nite::SkeletonState g_skeletonStates_[MAX_USERS] = {nite::SKELETON_NONE};
 
   /// Image transport
-  //image_transport::ImageTransport it;
-  //image_transport::CameraPublisher camera_publisher_;
+  image_transport::ImageTransport it;
+  image_transport::CameraPublisher camera_publisher;
+  sensor_msgs::Image depth_img;
+  sensor_msgs::CameraInfo depth_info;
+
   ros::Publisher image_out_publisher_;
   sensor_msgs::Image image_out_Image_msg_;
 
