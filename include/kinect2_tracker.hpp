@@ -91,11 +91,7 @@ public:
 
     if(this->depth_stream.create(this->devDevice_,openni::SENSOR_DEPTH)==openni::STATUS_OK)
     {
-      //Set depth mode
-//      const openni::SensorInfo* sinfo = this->devDevice_.getSensorInfo(openni::SENSOR_DEPTH);
-//      const openni::Array< openni::VideoMode>& modesDepth = sinfo->getSupportedVideoModes();
-//      if(this->depth_stream.setVideoMode(modesDepth[0]) != openni::STATUS_OK)
-//        ROS_ERROR("Depth format not supported...");
+      this->depth_stream.setMirroringEnabled(false);
 
       if(this->depth_stream.start()!=openni::STATUS_OK)
       {
@@ -104,13 +100,30 @@ public:
         return;
       }
       else
-      {
         ROS_INFO("Depth stream initialize successfully");
-      }
     }
     else
     {
       ROS_FATAL("Impossible to create depth stream");
+      ros::shutdown();
+      return;
+    }
+   
+    if(this->color_stream.create(this->devDevice_,openni::SENSOR_COLOR)==openni::STATUS_OK)
+    {
+      this->color_stream.setMirroringEnabled(false);
+      if(this->color_stream.start()!=openni::STATUS_OK)
+      {
+        ROS_FATAL("Impossible to start color stream");
+        ros::shutdown();
+        return;
+      }
+      else
+        ROS_INFO("Color stream initialize successfully");
+    }
+    else
+    {
+      ROS_FATAL("Impossible to create color stream");
       ros::shutdown();
       return;
     }
@@ -130,8 +143,9 @@ public:
     // Initialize the users IDs publisher
     userPub_ = nh_.advertise<skeleton_tracker::user_IDs>("/people", 1);
 
-    this->image_out_publisher_ = nh_.advertise<sensor_msgs::Image>("image_out/image_raw", 1);
-    this->camera_publisher = this->it.advertiseCamera("depth/image_raw", 1);
+    //this->image_out_publisher_ = nh_.advertise<sensor_msgs::Image>("image_out/image_raw", 1);
+    this->depth_camera_publisher = this->it.advertiseCamera("depth/image_raw", 1);
+    this->color_camera_publisher = this->it.advertiseCamera("color/image_raw", 1);
 
     rate_ = new ros::Rate(100);
 
@@ -149,86 +163,103 @@ public:
   */
   void spinner()
   {
-    // Broadcast the joint frames (if they exist)
     this->getSkeleton();
-
-    //Depth
-    bool mirror=true;
-    this->depth_stream.setMirroringEnabled(mirror);
-
-    this->depth_stream.readFrame(&this->depth_frame);
-    //ROS_INFO("Depth stream resolution %dx%d, data size: %d", this->depth_frame.getHeight(), this->depth_frame.getWidth(),this->depth_frame.getDataSize());
-    //std::cout << "height: " << this->depth_frame.getHeight() << " width: " << this->depth_frame.getWidth() << std::endl;
-    //std::cout << "data size: " << this->depth_frame.getDataSize() << std::endl;
-    this->image_out_Image_msg_.header.stamp=ros::Time::now();
-    this->image_out_Image_msg_.height=this->depth_frame.getHeight();
-    this->image_out_Image_msg_.width=this->depth_frame.getWidth();
-    this->image_out_Image_msg_.encoding="mono16";
-    this->image_out_Image_msg_.step=this->depth_frame.getWidth()*2;
-    this->image_out_Image_msg_.data.resize(this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
-    memcpy(this->image_out_Image_msg_.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
-    this->image_out_publisher_.publish(this->image_out_Image_msg_);
-
-    
-    this->depth_img.header.stamp=ros::Time::now();
-    this->depth_img.header.frame_id="kinect2_link";
-    this->depth_img.height=this->depth_frame.getHeight();
-    this->depth_img.width=this->depth_frame.getWidth();
-    this->depth_img.encoding="mono16";
-    this->depth_img.step=this->depth_frame.getWidth()*2;
-    this->depth_img.data.resize(this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
-    memcpy(this->depth_img.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
-    
-    this->depth_info.header.stamp    = this->depth_img.header.stamp;
-    this->depth_info.header.frame_id = this->depth_img.header.frame_id;
-    this->depth_info.height          = this->depth_img.height;
-    this->depth_info.width           = this->depth_img.width;
-    this->depth_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
-
-    float cx = 254.878f;
-    float cy = 205.395f;
-    float fx = 365.456f;
-    float fy = 365.456f;
-    float k1 = 0.0905474;
-    float k2 = -0.26819;
-    float k3 = 0.0950862;
-    float p1 = 0.0;
-    float p2 = 0.0; 
-
-    //float fx = devDevice_.getDepthFocalLength (); // Horizontal focal length
-    //float fy = devDevice_.getDepthFocalLength (); // Vertical focal length
-    //float cx = ((float)this->depth_frame.getWidth() - 1.f) / 2.f;  // Center x
-    //float cy = ((float)this->depth_frame.getHeight()- 1.f) / 2.f; // Center y    
-    //double k1,k2,k3,p1,p2=0.0;
-
-    this->depth_info.D.resize(5);
-    this->depth_info.D[0] = k1;
-    this->depth_info.D[1] = k2;
-    this->depth_info.D[2] = k3;
-    this->depth_info.D[3] = p1;
-    this->depth_info.D[4] = p2;
-
-
-    
-    this->depth_info.K.fill(0.0);
-    this->depth_info.K[0] = fx;
-    this->depth_info.K[2] = cx;
-    this->depth_info.K[4] = fy;
-    this->depth_info.K[5] = cy;
-    this->depth_info.K[8] = 1.0;
-
-    this->depth_info.R.fill(0.0);
-
-    this->depth_info.P.fill(0.0);
-    this->depth_info.P[0] = fx;
-    this->depth_info.P[2] = cx;
-    this->depth_info.P[5] = fy;
-    this->depth_info.P[6] = cy;
-    this->depth_info.P[10] = 1.0;
-    
-    this->camera_publisher.publish(this->depth_img, this->depth_info);
+    this->publishImages();
 
     rate_->sleep();
+  }
+  
+  void publishImages()
+  {
+    bool color=true;
+    bool depth=true;
+    std::string frame = "kinect2_link";
+
+    if(color)
+    {
+      this->color_stream.readFrame(&this->color_frame);
+      this->color_img.header.stamp    = ros::Time::now();
+      this->color_img.header.frame_id = frame;
+      this->color_img.height          = this->color_frame.getHeight();
+      this->color_img.width           = this->color_frame.getWidth();
+      this->color_img.encoding        = "rgb8"; 
+      this->color_img.is_bigendian    = 0;
+      this->color_img.step            = this->color_img.width*3;
+      this->color_img.data.resize(this->color_frame.getWidth()*this->color_frame.getHeight()*3);
+      memcpy(this->color_img.data.data(),this->color_frame.getData(),this->color_frame.getWidth()*this->color_frame.getHeight()*3);
+  
+      fillCameraInfo(this->color_info, this->color_img);
+      this->color_camera_publisher.publish(this->color_img, this->color_info); 
+    }
+
+    if(depth)
+    {
+      this->depth_stream.readFrame(&this->depth_frame);    
+      this->depth_img.header.stamp    = ros::Time::now();
+      this->depth_img.header.frame_id = frame;
+      this->depth_img.height          = this->depth_frame.getHeight();
+      this->depth_img.width           = this->depth_frame.getWidth();
+      this->depth_img.encoding        = "mono16";
+      this->depth_img.step            = this->depth_frame.getWidth()*2;
+      this->depth_img.data.resize(this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+      memcpy(this->depth_img.data.data(),this->depth_frame.getData(),this->depth_frame.getWidth()*this->depth_frame.getHeight()*2);
+
+      fillCameraInfo(this->depth_info, this->depth_img);
+      this->depth_camera_publisher.publish(this->depth_img, this->depth_info);
+    }
+  }
+  
+  void fillCameraInfo(sensor_msgs::CameraInfo & info, sensor_msgs::Image & img)
+  {
+    info.header.stamp    = img.header.stamp;
+    info.header.frame_id = img.header.frame_id;
+    info.height          = img.height;
+    info.width           = img.width;
+    info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+    
+    double fx,fy,cx,cy,k1,k2,k3,p1,p2=0.0;
+    if(img.width==1920)
+    {
+      fx=1081.3720703125; //540.68603515625;
+      fy=1081.3720703125; //540.68603515625;
+      cx = 959.5; //479.75;
+      cy = 539.5; //269.75;
+      k1,k2,k3,p1,p2=0.0;
+    }
+    else if (img.width=640)
+    {
+      fx=413; //531.15; //365.456;
+      fy=413; //531.15; //365.456;
+      cx=(img.width-1)/2.0; //254.878;
+      cy=(img.height-1)/2.0; //205.395;
+      k1,k2,k3,p1,p2=0.0;
+    }
+
+    info.D.resize(5);
+    info.D[0] = k1;
+    info.D[1] = k2;
+    info.D[2] = k3;
+    info.D[3] = p1;
+    info.D[4] = p2;
+    
+    info.K.fill(0.0);
+    info.K[0] = fx;
+    info.K[2] = cx;
+    info.K[4] = fy;
+    info.K[5] = cy;
+    info.K[8] = 1.0;
+
+    info.R.fill(0.0);
+    info.R[0] = 1.0;
+    info.R[4] = 1.0;
+    info.R[8] = 1.0;
+
+    info.P.fill(0.0);
+    info.P[0] = fx;
+    info.P[2] = cx;
+    info.P[5] = fy;
+    info.P[6] = cy;
+    info.P[10] = 1.0; 
   }
 
   /**
@@ -417,12 +448,17 @@ public:
 
   /// Image transport
   image_transport::ImageTransport it;
-  image_transport::CameraPublisher camera_publisher;
+
+  image_transport::CameraPublisher depth_camera_publisher;
   sensor_msgs::Image depth_img;
   sensor_msgs::CameraInfo depth_info;
+  
+  image_transport::CameraPublisher color_camera_publisher;
+  sensor_msgs::Image color_img;
+  sensor_msgs::CameraInfo color_info;
 
-  ros::Publisher image_out_publisher_;
-  sensor_msgs::Image image_out_Image_msg_;
+  //ros::Publisher image_out_publisher_;
+  //sensor_msgs::Image image_out_Image_msg_;
 
   std::string tf_prefix_, relative_frame_;
 
@@ -454,3 +490,4 @@ public:
 ;
 
 #endif /* KINECT2_TRACKER_HPP_ */
+
