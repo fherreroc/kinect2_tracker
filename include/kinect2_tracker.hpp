@@ -91,7 +91,7 @@ public:
 
     if(this->depth_stream.create(this->devDevice_,openni::SENSOR_DEPTH)==openni::STATUS_OK)
     {
-      this->depth_stream.setMirroringEnabled(false);
+      this->depth_stream.setMirroringEnabled(true);
 
       if(this->depth_stream.start()!=openni::STATUS_OK)
       {
@@ -111,7 +111,7 @@ public:
    
     if(this->color_stream.create(this->devDevice_,openni::SENSOR_COLOR)==openni::STATUS_OK)
     {
-      this->color_stream.setMirroringEnabled(false);
+      this->color_stream.setMirroringEnabled(true);
       if(this->color_stream.start()!=openni::STATUS_OK)
       {
         ROS_FATAL("Impossible to start color stream");
@@ -218,20 +218,21 @@ public:
     info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
     
     double fx,fy,cx,cy,k1,k2,k3,p1,p2=0.0;
-    if(img.width==1920)
+    //TODO: load parameters from calibration file?
+    if(img.width==1920) //1920*1080
     {
-      fx=1081.3720703125; //540.68603515625;
-      fy=1081.3720703125; //540.68603515625;
-      cx = 959.5; //479.75;
-      cy = 539.5; //269.75;
+      fx=1066;
+      fy=1068;
+      cx = (img.width-1)/2.0;
+      cy = (img.height-1)/2.0;
       k1,k2,k3,p1,p2=0.0;
     }
-    else if (img.width=640)
+    else if (img.width=640) //640*480
     {
-      fx=413; //531.15; //365.456;
-      fy=413; //531.15; //365.456;
-      cx=(img.width-1)/2.0; //254.878;
-      cy=(img.height-1)/2.0; //205.395;
+      fx=365;
+      fy=365;
+      cx=(img.width-1)/2.0;
+      cy=(img.height-1)/2.0;
       k1,k2,k3,p1,p2=0.0;
     }
 
@@ -320,18 +321,18 @@ public:
   {
     if (actual_joint.getPositionConfidence() > 0.0)
     {
-      tf::Vector3 actualPos = tf::Vector3(actual_joint.getPosition().x / 1000.0, actual_joint.getPosition().y / 1000.0, actual_joint.getPosition().z / 1000.0);
-      tf::Vector3 parentPos = tf::Vector3(parent_joint.getPosition().x / 1000.0, parent_joint.getPosition().y / 1000.0, parent_joint.getPosition().z / 1000.0);
+      tf::Vector3 actualPos = tf::Vector3(-actual_joint.getPosition().x / 1000.0, actual_joint.getPosition().y / 1000.0, actual_joint.getPosition().z / 1000.0);
+      tf::Vector3 parentPos = tf::Vector3(-parent_joint.getPosition().x / 1000.0, parent_joint.getPosition().y / 1000.0, parent_joint.getPosition().z / 1000.0);
       
       tf::Quaternion actualRot;
       if(actual_joint.getOrientationConfidence() > 0.0)
-        actualRot = tf::Quaternion(actual_joint.getOrientation().x, actual_joint.getOrientation().y, actual_joint.getOrientation().z, actual_joint.getOrientation().w);
+        actualRot = tf::Quaternion(actual_joint.getOrientation().x, -actual_joint.getOrientation().y, -actual_joint.getOrientation().z, actual_joint.getOrientation().w);
       else
         actualRot = tf::Quaternion(0,0,0,1);
       
       tf::Quaternion parentRot;
       if(parent_joint.getOrientationConfidence() > 0.0)
-        parentRot = tf::Quaternion(parent_joint.getOrientation().x, parent_joint.getOrientation().y, parent_joint.getOrientation().z, parent_joint.getOrientation().w);
+        parentRot = tf::Quaternion(parent_joint.getOrientation().x, -parent_joint.getOrientation().y, -parent_joint.getOrientation().z, parent_joint.getOrientation().w);
       else
         parentRot = tf::Quaternion(0,0,0,1);
 
@@ -352,11 +353,13 @@ public:
       }
 
       std::stringstream actual_frame_id_stream;
-      actual_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << actual_joint_name;
+      //FIXME actual_frame_id_stream << "/" << "user_" << uid << "/" << actual_joint_name;
+      actual_frame_id_stream << "/" << "user_" << "1" << "/" << actual_joint_name;
       std::string actual_frame_id = actual_frame_id_stream.str();
 
       std::stringstream parent_frame_id_stream;
-      parent_frame_id_stream << "/" << tf_prefix_ << "/user_" << uid << "/" << parent_joint_name;
+      //FIXME parent_frame_id_stream << "/" << "user_" << uid << "/" << parent_joint_name;
+      parent_frame_id_stream << "/" << "user_" << "1" << "/" << parent_joint_name;
       std::string parent_frame_id = parent_frame_id_stream.str();
 
       if(actual_joint_name!="torso")
@@ -490,4 +493,3 @@ public:
 ;
 
 #endif /* KINECT2_TRACKER_HPP_ */
-
