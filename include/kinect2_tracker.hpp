@@ -18,7 +18,7 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <iostream>
-#include "user_IDs.h" 
+#include <kinect2_tracker/user_IDs.h> 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -45,13 +45,13 @@ typedef std::map<std::string, nite::SkeletonJoint> JointMap;
 /**
 * Class \ref kinect2_tracker. This class can track the skeleton of people and returns joints as a TF stream,
 */
-class kinect2_tracker
+class kinect2_tracker_node
 {
 public:
   /**
   * Constructor
   */
-  kinect2_tracker() :
+  kinect2_tracker_node() :
      it(nh_)
   {
 
@@ -141,7 +141,7 @@ public:
     }
 
     // Initialize the users IDs publisher
-    userPub_ = nh_.advertise<skeleton_tracker::user_IDs>("/people", 1);
+    userPub_ = nh_.advertise<kinect2_tracker::user_IDs>("/people", 1);
 
     //this->image_out_publisher_ = nh_.advertise<sensor_msgs::Image>("image_out/image_raw", 1);
     this->depth_camera_publisher = this->it.advertiseCamera("depth/image_raw", 1);
@@ -153,7 +153,7 @@ public:
   /**
   * Destructor
   */
-  ~kinect2_tracker()
+  ~kinect2_tracker_node()
   {
     nite::NiTE::shutdown();
   }
@@ -231,8 +231,8 @@ public:
     {
       fx=365;
       fy=365;
-      cx=(img.width-1)/2.0;
-      cy=(img.height-1)/2.0;
+      cx=-60+(img.width-1)/2.0;
+      cy=-20+(img.height-1)/2.0;
       k1,k2,k3,p1,p2=0.0;
     }
 
@@ -376,7 +376,7 @@ public:
   */
   void getSkeleton()
   {
-    skeleton_tracker::user_IDs ids;
+    kinect2_tracker::user_IDs ids;
     niteRc_ = userTracker_.readFrame(&userTrackerFrame_);
     if (niteRc_ != nite::STATUS_OK)
     {
