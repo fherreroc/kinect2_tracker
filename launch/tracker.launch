@@ -2,8 +2,8 @@
 <!-- -->
 <launch>
   
-  <arg name="camera" default="kinect"/>
-  <arg name="frame" default="$(arg camera)_link_2"/>
+  <arg name="camera" default="kinect2"/>
+  <arg name="frame" default="$(arg camera)_link"/>
   <arg name="tracker_name" default="$(arg camera)"/>
 
   <node pkg="kinect2_tracker" type="kinect2_tracker_node" name="kinect2_tracker" output="screen">
@@ -12,6 +12,6 @@
   </node>
 
   <node pkg="tf" type="static_transform_publisher" name="static_kinect_fix"
-        args="0 0 0 3.14159 0 0 $(arg camera)_link $(arg camera)_link_2 10"/>
+        args="0 0 2.0 3.14159 0 0 /ground $(arg frame) 10"/>
 
 </launch>

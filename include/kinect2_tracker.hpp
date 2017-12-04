@@ -1,4 +1,4 @@
-/**
+ /**
 * \ref kinect2_tracker.hpp
 *
 *  \date 20160322
@@ -173,7 +173,9 @@ public:
   {
     bool color=true;
     bool depth=true;
-    std::string frame = "kinect2_link";
+    //std::string frame = "kinect2_link";
+    std::string frame = relative_frame_;
+    
 
     if(color)
     {
@@ -231,8 +233,8 @@ public:
     {
       fx=365;
       fy=365;
-      cx=-60+(img.width-1)/2.0;
-      cy=-20+(img.height-1)/2.0;
+      cx= (img.width-1)/2.0;
+      cy= (img.height-1)/2.0;
       k1,k2,k3,p1,p2=0.0;
     }
 
