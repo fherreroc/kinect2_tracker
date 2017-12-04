@@ -86,3 +86,26 @@ include_directories(${OpenCV_INCLUDE_DIRS}/include)
 
 add_executable(kinect2_tracker_node src/kinect2_tracker_node.cpp)
 target_link_libraries(kinect2_tracker_node OpenNI2 ${NITE2_LIB}  ${catkin_LIBRARIES} ${Eigen_LIBRARIES})
+
+
+# #set(NITE2_DIR ~/NiTE-Linux-x64-2.2/)
+# #set(NITE2_LIB ~//NiTE-Linux-x64-2.2/Redist/libNiTE2.so)
+# 
+# set(NITE2_INCLUDE "/home/kinect/libs/NiTE-Linux-x64-2.2/Include")
+# #set(NITE2_REDIST64 "/home/kinect/libs/NiTE-Linux-x64-2.2/Redist")
+# link_directories("/home/kinect/libs/NiTE-Linux-x64-2.2/Redist")
+# 
+# set(OPENNI2_INCLUDE "/home/kinect/libs/OpenNI-Linux-x64-2.2/Include")
+# link_directories("/home/kinect/libs/OpenNI-Linux-x64-2.2/Redist")
+# #set(OPENNI2_REDIST64 "/home/kinect/libs/OpenNI-Linux-x64-2.2/Redist")
+# 
+# #include_directories(./include/Openni2/)
+# include_directories(${OPENNI2_INCLUDE})
+# include_directories(${NITE2_INCLUDE})
+# include_directories(./include)
+# include_directories(${OpenCV_INCLUDE_DIRS}/include)
+# 
+# add_executable(kinect2_tracker_node src/kinect2_tracker_node.cpp)
+# #target_link_libraries(kinect2_tracker_node OpenNI2 ${NITE2_REDIST64}  ${catkin_LIBRARIES} ${Eigen_LIBRARIES})
+# target_link_libraries(kinect2_tracker_node ${catkin_LIBRARIES} ${Eigen_LIBRARIES} libNiTE2.so libOpenNI2.so)
+
