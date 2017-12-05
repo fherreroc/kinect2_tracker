@@ -64,9 +64,16 @@ public:
       return;
     }
 
-    if (!pnh.getParam("relative_frame", relative_frame_))
+    if (!pnh.getParam("skeleton_frame", skeleton_frame_))
     {
-      ROS_FATAL("relative_frame not found on Param Server! Maybe you should add it to your launch file!");
+      ROS_FATAL("skeleton_frame not found on Param Server! Maybe you should add it to your launch file!");
+      ros::shutdown();
+      return;
+    }
+    
+    if (!pnh.getParam("camera_frame", camera_frame_))
+    {
+      ROS_FATAL("camera_frame not found on Param Server! Maybe you should add it to your launch file!");
       ros::shutdown();
       return;
     }
@@ -174,7 +181,7 @@ public:
     bool color=true;
     bool depth=true;
     //std::string frame = "kinect2_link";
-    std::string frame = relative_frame_;
+    std::string frame = camera_frame_;
     
 
     if(color)
@@ -328,13 +335,13 @@ public:
       
       tf::Quaternion actualRot;
       if(actual_joint.getOrientationConfidence() > 0.0)
-        actualRot = tf::Quaternion(actual_joint.getOrientation().x, -actual_joint.getOrientation().y, -actual_joint.getOrientation().z, actual_joint.getOrientation().w);
+        actualRot = tf::Quaternion(actual_joint.getOrientation().x, actual_joint.getOrientation().y, actual_joint.getOrientation().z, actual_joint.getOrientation().w);
       else
         actualRot = tf::Quaternion(0,0,0,1);
       
       tf::Quaternion parentRot;
       if(parent_joint.getOrientationConfidence() > 0.0)
-        parentRot = tf::Quaternion(parent_joint.getOrientation().x, -parent_joint.getOrientation().y, -parent_joint.getOrientation().z, parent_joint.getOrientation().w);
+        parentRot = tf::Quaternion(parent_joint.getOrientation().x, parent_joint.getOrientation().y, parent_joint.getOrientation().z, parent_joint.getOrientation().w);
       else
         parentRot = tf::Quaternion(0,0,0,1);
 
@@ -419,7 +426,7 @@ public:
         named_joints["right_hand"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HAND));
 
         //Publish the joint (name, niteConstruct, ConnectedJoint name, niteConstruct, User)
-        publishJointTF("torso",          named_joints["torso"],          relative_frame_,  named_joints["torso"], user.getId());
+        publishJointTF("torso",          named_joints["torso"],          skeleton_frame_,  named_joints["torso"], user.getId());
         publishJointTF("left_hip",       named_joints["left_hip"],       "torso",          named_joints["torso"], user.getId());
         publishJointTF("right_hip",      named_joints["right_hip"],      "torso",          named_joints["torso"], user.getId());
         publishJointTF("neck",           named_joints["neck"],           "torso",          named_joints["torso"], user.getId());
@@ -465,7 +472,7 @@ public:
   //ros::Publisher image_out_publisher_;
   //sensor_msgs::Image image_out_Image_msg_;
 
-  std::string tf_prefix_, relative_frame_;
+  std::string tf_prefix_, camera_frame_, skeleton_frame_;
 
   /// Frame broadcaster
   tf::TransformBroadcaster tfBroadcast_;
