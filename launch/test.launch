@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- -->
+<launch>
+
+  <include file="$(find kinect2_tracker)/launch/tracker.launch">
+    <arg name="camera" value="kinect2"/>
+  </include>
+
+  <node pkg="rviz" 
+        type="rviz" 
+        name="rviz" 
+        args="-d $(find kinect2_tracker)/rviz/tracker.rviz">
+  </node>
+
+</launch>
