@@ -354,6 +354,9 @@ public:
         transform_parent.setOrigin(parentPos);
         transform_parent.setRotation(parentRot);
         transform = transform_parent.inverse()*transform;
+        //tf::Vector3 t = transform.getOrigin();
+        //t.setY(t.getY()*-1.0);
+        //transform.setOrigin(t);
       }
       else
       {
@@ -412,10 +415,6 @@ public:
         named_joints["torso"]          = (user.getSkeleton().getJoint(nite::JOINT_TORSO));
         named_joints["left_hip"]       = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HIP));
         named_joints["right_hip"]      = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HIP));
-        named_joints["left_knee"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_KNEE));
-        named_joints["right_knee"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_KNEE));
-        named_joints["left_foot"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_FOOT));
-        named_joints["right_foot"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_FOOT));
         named_joints["neck"]           = (user.getSkeleton().getJoint(nite::JOINT_NECK));  
         named_joints["head"]           = (user.getSkeleton().getJoint(nite::JOINT_HEAD));
         named_joints["left_shoulder"]  = (user.getSkeleton().getJoint(nite::JOINT_LEFT_SHOULDER));
@@ -424,24 +423,28 @@ public:
         named_joints["right_elbow"]    = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_ELBOW));
         named_joints["left_hand"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_HAND));
         named_joints["right_hand"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_HAND));
+        named_joints["left_knee"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_KNEE));
+        named_joints["right_knee"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_KNEE));
+        named_joints["left_foot"]      = (user.getSkeleton().getJoint(nite::JOINT_LEFT_FOOT));
+        named_joints["right_foot"]     = (user.getSkeleton().getJoint(nite::JOINT_RIGHT_FOOT));
 
         //Publish the joint (name, niteConstruct, ConnectedJoint name, niteConstruct, User)
         publishJointTF("torso",          named_joints["torso"],          skeleton_frame_,  named_joints["torso"], user.getId());
-        publishJointTF("left_hip",       named_joints["left_hip"],       "torso",          named_joints["torso"], user.getId());
-        publishJointTF("right_hip",      named_joints["right_hip"],      "torso",          named_joints["torso"], user.getId());
+        publishJointTF("right_hip",      named_joints["left_hip"],       "torso",          named_joints["torso"], user.getId());
+        publishJointTF("left_hip",       named_joints["right_hip"],      "torso",          named_joints["torso"], user.getId());
         publishJointTF("neck",           named_joints["neck"],           "torso",          named_joints["torso"], user.getId());
         publishJointTF("head",           named_joints["head"],           "neck",           named_joints["neck"], user.getId());
-        publishJointTF("left_shoulder",  named_joints["left_shoulder"],  "neck",           named_joints["neck"], user.getId());
-        publishJointTF("right_shoulder", named_joints["right_shoulder"], "neck",           named_joints["neck"], user.getId());
-        publishJointTF("left_elbow",     named_joints["left_elbow"],     "left_shoulder",  named_joints["left_shoulder"], user.getId());
-        publishJointTF("right_elbow",    named_joints["right_elbow"],    "right_shoulder", named_joints["right_shoulder"], user.getId());
-        publishJointTF("left_hand",      named_joints["left_hand"],      "left_elbow",     named_joints["left_elbow"], user.getId());
-        publishJointTF("right_hand",     named_joints["right_hand"],     "right_elbow",    named_joints["right_elbow"], user.getId());
+        publishJointTF("right_shoulder", named_joints["left_shoulder"],  "neck",           named_joints["neck"], user.getId());
+        publishJointTF("left_shoulder",  named_joints["right_shoulder"], "neck",           named_joints["neck"], user.getId());
+        publishJointTF("right_elbow",    named_joints["left_elbow"],     "right_shoulder",  named_joints["left_shoulder"], user.getId());
+        publishJointTF("left_elbow",     named_joints["right_elbow"],    "left_shoulder", named_joints["right_shoulder"], user.getId());
+        publishJointTF("right_hand",     named_joints["left_hand"],      "right_elbow",     named_joints["left_elbow"], user.getId());
+        publishJointTF("left_hand",      named_joints["right_hand"],     "left_elbow",    named_joints["right_elbow"], user.getId());
         /**/
-        publishJointTF("left_knee",      named_joints["left_knee"],      "left_hip",       named_joints["left_hip"], user.getId());
-        publishJointTF("right_knee",     named_joints["right_knee"],     "right_hip",      named_joints["right_hip"], user.getId());
-        publishJointTF("left_foot",      named_joints["left_foot"],      "left_knee",      named_joints["left_knee"], user.getId());
-        publishJointTF("right_foot",     named_joints["right_foot"],     "right_knee",     named_joints["right_knee"], user.getId());
+        publishJointTF("right_knee",     named_joints["left_knee"],      "right_hip",       named_joints["left_hip"], user.getId());
+        publishJointTF("left_knee",      named_joints["right_knee"],     "left_hip",      named_joints["right_hip"], user.getId());
+        publishJointTF("right_foot",     named_joints["left_foot"],      "right_knee",      named_joints["left_knee"], user.getId());
+        publishJointTF("left_foot",      named_joints["right_foot"],     "left_knee",     named_joints["right_knee"], user.getId());
         /**/
 
         // Add the user's ID
